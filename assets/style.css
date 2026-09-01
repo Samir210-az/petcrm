@@ -10,7 +10,18 @@ input,button{width:100%;padding:14px;margin-top:12px;border-radius:8px;border:1p
 button{background:var(--qizili);color:var(--ag);border:none;font-weight:700;cursor:pointer;transition:0.2s;}
 button:hover{opacity:0.9;transform:translateY(-1px);}
 .role-btn{background:var(--tund-goy);margin-top:8px;}
-.header{background:var(--tund-goy);color:var(--ag);padding:20px;border-radius:12px;display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;}
+.header{background:var(--tund-goy);color:var(--ag);padding:16px 20px;border-radius:12px;display:flex;flex-wrap:wrap;gap:12px;justify-content:space-between;align-items:center;margin-bottom:20px;}
+.header > div:last-child{display:flex;gap:8px;flex-wrap:wrap;}
+.header button{width:auto;}
+
+@media (max-width: 480px){
+  .container{padding:12px;}
+  .login-box{margin:40px auto;padding:28px 20px;}
+  .header{padding:14px 16px;}
+  .header h2{font-size:18px;}
+  .header p{font-size:13px;}
+  .menu button{min-width:120px; font-size:14px;}
+}
 .card{background:var(--ag);padding:20px;border-radius:12px;margin-top:20px;box-shadow:0 4px 12px rgba(0,0,0,0.05);}
 .card h3{border-left:4px solid var(--qizili);padding-left:10px;margin-bottom:15px;}
 .alert{background:#FFF8E1;border-left:4px solid var(--qizili);padding:14px;margin-top:10px;border-radius:8px;cursor:pointer;transition:0.2s;}
