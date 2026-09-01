@@ -20,16 +20,44 @@
   </div>
 </div>
 <script type="module">
-  import { db, ref, onValue } from './assets/firebase.js';
-  const role = new URLSearchParams(window.location.search).get('role');
-  document.getElementById('roleTitle').innerText = role === 'magaza'? 'Zoomağaza Paneli' : 'Baytar Klinikası Paneli';
-  if(role === 'magaza') document.getElementById('posCard').style.display = 'block';
-  const alertsRef = ref(db, 'alerts/');
-  onValue(alertsRef, (snapshot) => {
-    const data = snapshot.val(); let html = '';
-    for(let id in data){ html += `<div class="alert" onclick="window.location.href='pet-card.html?id=${data[id].petId}'">${data[id].text}</div>`; }
-    document.getElementById('alertsList').innerHTML = html || 'Xəbərdarlıq yoxdur';
+  import { db, auth, ref, get, onValue, onAuthStateChanged } from './assets/firebase.js';
+
+  function isPlanValid(business) {
+    if (!business) return false;
+    if (business.plan === 'active') {
+      return !business.expiresAt || Date.now() < business.expiresAt;
+    }
+    if (business.plan === 'trial') {
+      return Date.now() < business.expiresAt;
+    }
+    return false;
+  }
+
+  onAuthStateChanged(auth, async (user) => {
+    if (!user) {
+      window.location.href = 'index.html';
+      return;
+    }
+    const snapshot = await get(ref(db, `businesses/${user.uid}`));
+    const business = snapshot.val();
+    if (!isPlanValid(business)) {
+      window.location.href = 'index.html';
+      return;
+    }
+    initDashboard();
   });
+
+  function initDashboard() {
+    const role = new URLSearchParams(window.location.search).get('role');
+    document.getElementById('roleTitle').innerText = role === 'magaza' ? 'Zoomağaza Paneli' : 'Baytar Klinikası Paneli';
+    if (role === 'magaza') document.getElementById('posCard').style.display = 'block';
+    const alertsRef = ref(db, 'alerts/');
+    onValue(alertsRef, (snapshot) => {
+      const data = snapshot.val(); let html = '';
+      for (let id in data) { html += `<div class="alert" onclick="window.location.href='pet-card.html?id=${data[id].petId}'">${data[id].text}</div>`; }
+      document.getElementById('alertsList').innerHTML = html || 'Xəbərdarlıq yoxdur';
+    });
+  }
 </script>
 </body>
 </html>
