@@ -10,6 +10,7 @@
   <div class="header">
     <div><h2>PET CRM</h2><p id="roleTitle"></p></div>
     <div style="display:flex; gap:10px;">
+      <button id="switchTypeBtn" onclick="switchBusinessType()" style="width:auto; display:none; background:#777;">🔄 Növü Dəyiş</button>
       <button id="teamBtn" onclick="window.location.href='team.html'" style="width:auto; display:none;">👥 Komandam</button>
       <button onclick="window.location.href='pet-card.html'" style="width:auto;">+ Yeni Heyvan</button>
     </div>
@@ -24,7 +25,7 @@
   </div>
 </div>
 <script type="module">
-  import { db, auth, ref, get, onValue, onAuthStateChanged } from './assets/firebase.js';
+  import { db, auth, ref, get, update, onValue, onAuthStateChanged } from './assets/firebase.js';
 
   function isPlanValid(business) {
     if (!business) return false;
@@ -63,7 +64,10 @@
 
   const ROLE_LABELS = { baytar: 'Baytar', resepshn: 'Resepşn', laborant: 'Laborant', diger: 'İşçi' };
 
+  let currentBusinessId = null;
+
   function initDashboard(business, userInfo) {
+    currentBusinessId = userInfo.businessId;
     let titleText = business.businessType === 'magaza' ? 'Zoomağaza Paneli' : 'Baytar Klinikası Paneli';
     if (!userInfo.isOwner) {
       titleText += ` — ${ROLE_LABELS[userInfo.staffRole] || 'İşçi'}`;
@@ -71,7 +75,10 @@
     document.getElementById('roleTitle').innerText = titleText;
 
     if (business.businessType === 'magaza') document.getElementById('posCard').style.display = 'block';
-    if (userInfo.isOwner) document.getElementById('teamBtn').style.display = 'inline-block';
+    if (userInfo.isOwner) {
+      document.getElementById('teamBtn').style.display = 'inline-block';
+      document.getElementById('switchTypeBtn').style.display = 'inline-block';
+    }
 
     const alertsRef = ref(db, 'alerts/');
     onValue(alertsRef, (snapshot) => {
@@ -79,6 +86,16 @@
       for (let id in data) { html += `<div class="alert" onclick="window.location.href='pet-card.html?id=${data[id].petId}'">${data[id].text}</div>`; }
       document.getElementById('alertsList').innerHTML = html || 'Xəbərdarlıq yoxdur';
     });
+  }
+
+  window.switchBusinessType = async () => {
+    const snap = await get(ref(db, `businesses/${currentBusinessId}/businessType`));
+    const current = snap.val();
+    const next = current === 'magaza' ? 'klinika' : 'magaza';
+    const label = next === 'magaza' ? 'Zoomağaza / Grooming' : 'Baytar Klinikası';
+    if (!confirm(`Biznes növünü "${label}" olaraq dəyişmək istəyirsiniz?`)) return;
+    await update(ref(db, `businesses/${currentBusinessId}`), { businessType: next });
+    window.location.reload();
   }
 </script>
 </body>
