@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="az">
+<head>
+<meta charset="UTF-8"><title>Dashboard - PET CRM</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <div><h2>PET CRM</h2><p id="roleTitle"></p></div>
+    <button onclick="window.location.href='pet-card.html'" style="width:auto;">+ Yeni Heyvan</button>
+  </div>
+  <div class="card">
+    <h3>🚨 Smart Xəbərdarlıqlar</h3>
+    <div id="alertsList">Yüklənir...</div>
+  </div>
+  <div class="card" id="posCard" style="display:none;">
+    <h3>💰 Tez Satış - POS</h3>
+    <button onclick="window.location.href='pos.html'">POS Ekranını Aç</button>
+  </div>
+</div>
+<script type="module">
+  import { db, ref, onValue } from './assets/firebase.js';
+  const role = new URLSearchParams(window.location.search).get('role');
+  document.getElementById('roleTitle').innerText = role === 'magaza'? 'Zoomağaza Paneli' : 'Baytar Klinikası Paneli';
+  if(role === 'magaza') document.getElementById('posCard').style.display = 'block';
+  const alertsRef = ref(db, 'alerts/');
+  onValue(alertsRef, (snapshot) => {
+    const data = snapshot.val(); let html = '';
+    for(let id in data){ html += `<div class="alert" onclick="window.location.href='pet-card.html?id=${data[id].petId}'">${data[id].text}</div>`; }
+    document.getElementById('alertsList').innerHTML = html || 'Xəbərdarlıq yoxdur';
+  });
+</script>
+</body>
+</html>
