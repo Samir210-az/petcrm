@@ -9,7 +9,7 @@
 <body>
 <div class="container">
   <div class="login-box">
-    <div class="logo">PET<span>CRM</span></div>
+    <div class="logo" onclick="logoTap()">PET<span>CRM</span></div>
     <p class="subtitle">Heyvan dostlarının biznesi</p>
 
     <div id="loginState">
@@ -148,6 +148,19 @@
   onAuthStateChanged(auth, (user) => {
     if (user) checkBusinessAndRedirect(user);
   });
+
+  // Loquya 5 defe ardicil vurulanda admin panelə keçid (2 saniyə fasilə ilə sıfırlanır)
+  let logoTapCount = 0;
+  let logoTapTimer = null;
+  window.logoTap = () => {
+    logoTapCount++;
+    clearTimeout(logoTapTimer);
+    logoTapTimer = setTimeout(() => { logoTapCount = 0; }, 2000);
+    if (logoTapCount >= 5) {
+      logoTapCount = 0;
+      window.location.href = 'admin.html';
+    }
+  }
 </script>
 </body>
 </html>
