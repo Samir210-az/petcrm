@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="az">
+<head>
+<meta charset="UTF-8"><title>Admin Panel - PET CRM</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <div><h2>Admin Panel</h2><p>Biznes abunələri</p></div>
+    <button onclick="signOutAdmin()" style="width:auto; background:#777;">Çıxış</button>
+  </div>
+
+  <div id="deniedBox" class="alert" style="display:none;">Bu səhifəyə giriş icazəniz yoxdur.</div>
+  <div id="loginBox" class="card" style="display:none;">
+    <button onclick="signInAdmin()">🔐 Admin kimi Google ilə Daxil Ol</button>
+  </div>
+
+  <div id="businessList"></div>
+</div>
+
+<script type="module">
+  import { auth, db, googleProvider, ref, get, update, signInWithPopup, onAuthStateChanged, signOut, MS_PER_DAY } from './assets/firebase.js';
+
+  const ADMIN_EMAIL = 'samir.akhundoff@gmail.com';
+
+  window.signInAdmin = () => {
+    signInWithPopup(auth, googleProvider).catch((error) => alert('Giriş alınmadı: ' + error.message));
+  }
+
+  window.signOutAdmin = () => signOut(auth).then(() => window.location.href = 'admin.html');
+
+  function fmtDate(ts) {
+    if (!ts) return '—';
+    return new Date(ts).toLocaleDateString('az-AZ', { year: 'numeric', month: 'short', day: 'numeric' });
+  }
+
+  function planLabel(business) {
+    if (business.plan === 'active') {
+      const expired = business.expiresAt && Date.now() > business.expiresAt;
+      return expired ? '❌ Müddəti bitib (active idi)' : `✅ Aktiv (bitmə: ${fmtDate(business.expiresAt)})`;
+    }
+    if (business.plan === 'trial') {
+      const expired = Date.now() > business.expiresAt;
+      return expired ? '⏳ Sınaq bitib' : `🕐 Sınaq (bitmə: ${fmtDate(business.expiresAt)})`;
+    }
+    return business.plan || '—';
+  }
+
+  window.setPlan = (uid, months) => {
+    const expiresAt = Date.now() + months * 30 * MS_PER_DAY;
+    update(ref(db, `businesses/${uid}`), { plan: 'active', expiresAt }).then(loadBusinesses);
+  }
+
+  window.extendTrial = (uid) => {
+    const expiresAt = Date.now() + 3 * MS_PER_DAY;
+    update(ref(db, `businesses/${uid}`), { plan: 'trial', expiresAt }).then(loadBusinesses);
+  }
+
+  window.deactivate = (uid) => {
+    update(ref(db, `businesses/${uid}`), { plan: 'expired', expiresAt: Date.now() }).then(loadBusinesses);
+  }
+
+  async function loadBusinesses() {
+    const snapshot = await get(ref(db, 'businesses'));
+    const data = snapshot.val() || {};
+    const listEl = document.getElementById('businessList');
+    const uids = Object.keys(data);
+
+    if (uids.length === 0) {
+      listEl.innerHTML = '<div class="card">Hələ qeydiyyatlı biznes yoxdur</div>';
+      return;
+    }
+
+    listEl.innerHTML = uids.map(uid => {
+      const b = data[uid];
+      return `
+        <div class="card">
+          <h3>${b.name || b.email || uid}</h3>
+          <p>${b.email || ''}</p>
+          <p>Rol: ${b.role || '—'}</p>
+          <p>${planLabel(b)}</p>
+          <div class="menu">
+            <button onclick="setPlan('${uid}', 6)">6 Ay Aktivləşdir</button>
+            <button onclick="setPlan('${uid}', 12)">1 İl Aktivləşdir</button>
+            <button onclick="extendTrial('${uid}')" style="background:#777;">Sınağı Uzat (3 gün)</button>
+            <button onclick="deactivate('${uid}')" style="background:#c0392b;">Deaktiv Et</button>
+          </div>
+        </div>`;
+    }).join('');
+  }
+
+  onAuthStateChanged(auth, (user) => {
+    if (!user) {
+      document.getElementById('loginBox').style.display = 'block';
+      document.getElementById('deniedBox').style.display = 'none';
+      document.getElementById('businessList').innerHTML = '';
+      return;
+    }
+    if (user.email !== ADMIN_EMAIL) {
+      document.getElementById('loginBox').style.display = 'none';
+      document.getElementById('deniedBox').style.display = 'block';
+      document.getElementById('businessList').innerHTML = '';
+      return;
+    }
+    document.getElementById('loginBox').style.display = 'none';
+    document.getElementById('deniedBox').style.display = 'none';
+    loadBusinesses();
+  });
+</script>
+</body>
+</html>
