@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="az">
+<head>
+<meta charset="UTF-8"><title>Komandam - PET CRM</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <div><h2>Komandam</h2><p>İşçiləri idarə et</p></div>
+    <button onclick="window.location.href='dashboard.html'" style="width:auto; background:#777;">← Geri</button>
+  </div>
+
+  <div id="deniedBox" class="alert" style="display:none;">Bu səhifə yalnız biznes sahibləri üçündür.</div>
+
+  <div id="ownerBox" style="display:none;">
+    <div class="card">
+      <h3>+ Yeni İşçi Dəvət Et</h3>
+      <input id="staffEmail" type="email" placeholder="İşçinin email ünvanı">
+      <select id="staffRole" style="width:100%; padding:14px; margin-top:12px; border-radius:8px; border:1px solid #ddd; font-size:16px;">
+        <option value="baytar">Baytar</option>
+        <option value="resepshn">Resepşn</option>
+        <option value="laborant">Laborant</option>
+        <option value="diger">Digər</option>
+      </select>
+      <button onclick="inviteStaff()">Dəvət Göndər</button>
+    </div>
+
+    <div class="card">
+      <h3>Cari Komanda</h3>
+      <div id="staffList">Yüklənir...</div>
+    </div>
+
+    <div class="card">
+      <h3>Gözləyən Dəvətlər</h3>
+      <div id="pendingList">Yüklənir...</div>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+  import { db, auth, ref, get, set, remove, onAuthStateChanged, emailToKey } from './assets/firebase.js';
+
+  const ROLE_LABELS = { baytar: 'Baytar', resepshn: 'Resepşn', laborant: 'Laborant', diger: 'İşçi' };
+  let currentBusinessId = null;
+
+  onAuthStateChanged(auth, async (user) => {
+    if (!user) { window.location.href = 'index.html'; return; }
+
+    const userSnap = await get(ref(db, `users/${user.uid}`));
+    if (!userSnap.exists() || !userSnap.val().isOwner) {
+      document.getElementById('deniedBox').style.display = 'block';
+      return;
+    }
+
+    currentBusinessId = userSnap.val().businessId;
+    document.getElementById('ownerBox').style.display = 'block';
+    loadStaff();
+    loadPendingInvites();
+  });
+
+  async function loadStaff() {
+    const snap = await get(ref(db, `businesses/${currentBusinessId}/staff`));
+    const data = snap.val() || {};
+    const uids = Object.keys(data);
+    const listEl = document.getElementById('staffList');
+
+    if (uids.length === 0) {
+      listEl.innerHTML = 'Hələ işçi yoxdur';
+      return;
+    }
+
+    listEl.innerHTML = uids.map(uid => {
+      const s = data[uid];
+      return `
+        <div class="pos-item">
+          <span>${s.name || s.email} <span class="badge">${ROLE_LABELS[s.role] || s.role}</span></span>
+          <button onclick="removeStaff('${uid}')" style="width:auto; background:#c0392b;">Sil</button>
+        </div>`;
+    }).join('');
+  }
+
+  async function loadPendingInvites() {
+    const snap = await get(ref(db, 'staffDirectory'));
+    const data = snap.val() || {};
+    const listEl = document.getElementById('pendingList');
+    const pending = Object.entries(data).filter(([key, invite]) => invite.businessId === currentBusinessId);
+
+    if (pending.length === 0) {
+      listEl.innerHTML = 'Gözləyən dəvət yoxdur';
+      return;
+    }
+
+    listEl.innerHTML = pending.map(([key, invite]) => `
+      <div class="pos-item">
+        <span>${invite.email} <span class="badge">${ROLE_LABELS[invite.role] || invite.role}</span></span>
+        <button onclick="cancelInvite('${key}')" style="width:auto; background:#777;">Ləğv Et</button>
+      </div>`).join('');
+  }
+
+  window.inviteStaff = async () => {
+    const email = document.getElementById('staffEmail').value.trim();
+    const role = document.getElementById('staffRole').value;
+    if (!email) { alert('Email daxil edin'); return; }
+
+    const key = emailToKey(email);
+    await set(ref(db, `staffDirectory/${key}`), {
+      businessId: currentBusinessId,
+      email: email,
+      role: role,
+      invitedAt: Date.now()
+    });
+    document.getElementById('staffEmail').value = '';
+    alert('Dəvət göndərildi. İşçi öz Google hesabı ilə daxil olanda avtomatik əlavə olunacaq.');
+    loadPendingInvites();
+  }
+
+  window.removeStaff = async (uid) => {
+    if (!confirm('Bu işçini komandadan çıxarmaq istədiyinizə əminsiniz?')) return;
+    await remove(ref(db, `businesses/${currentBusinessId}/staff/${uid}`));
+    await remove(ref(db, `users/${uid}`));
+    loadStaff();
+  }
+
+  window.cancelInvite = async (key) => {
+    await remove(ref(db, `staffDirectory/${key}`));
+    loadPendingInvites();
+  }
+</script>
+</body>
+</html>
