@@ -11,39 +11,93 @@
   <div class="login-box">
     <div class="logo">PET<span>CRM</span></div>
     <p class="subtitle">Heyvan dostlarının biznesi</p>
-    <input type="tel" id="phone" placeholder="+994 50 123 45 67">
-    <div id="recaptcha-container"></div>
-    <button onclick="sendCode()">SMS Kod Göndər</button>
-    <div id="codeBox" style="display:none;">
-      <input type="text" id="code" placeholder="SMS Kodu daxil et">
-      <button onclick="verifyCode()">Daxil Ol</button>
+
+    <div id="loginState">
+      <button id="googleBtn" onclick="signInGoogle()">🔐 Google ilə Daxil Ol</button>
     </div>
+
     <div id="roles" style="display:none;">
       <p>Siz kimsiniz?</p>
       <button class="role-btn" onclick="saveRole('klinika')">🏥 Baytar Klinikası</button>
       <button class="role-btn" onclick="saveRole('magaza')">🛍️ Zoomağaza / Grooming</button>
     </div>
+
+    <div id="expiredBox" class="alert" style="display:none; margin-top:20px;">
+      Sınaq müddətiniz başa çatıb. Davam etmək üçün admin ilə əlaqə saxlayın.
+    </div>
   </div>
 </div>
+
 <script type="module">
-  import { auth, RecaptchaVerifier, signInWithPhoneNumber } from './assets/firebase.js';
-  window.recaptchaVerifier = new RecaptchaVerifier('recaptcha-container', { 'size': 'invisible' }, auth);
-  let confirmationResult;
-  window.sendCode = () => {
-    const phone = document.getElementById('phone').value;
-    signInWithPhoneNumber(auth, phone, window.recaptchaVerifier).then((result) => {
-      confirmationResult = result; document.getElementById('codeBox').style.display = 'block'; alert('SMS göndərildi');
-    }).catch((error) => alert(error.message));
+  import { auth, db, googleProvider, ref, get, set, update, signInWithPopup, onAuthStateChanged, TRIAL_DAYS, MS_PER_DAY } from './assets/firebase.js';
+
+  function isPlanValid(business) {
+    if (!business) return false;
+    if (business.plan === 'active') {
+      return !business.expiresAt || Date.now() < business.expiresAt;
+    }
+    if (business.plan === 'trial') {
+      return Date.now() < business.expiresAt;
+    }
+    return false;
   }
-  window.verifyCode = () => {
-    const code = document.getElementById('code').value;
-    confirmationResult.confirm(code).then((result) => {
-      localStorage.setItem('userId', result.user.uid); document.getElementById('roles').style.display = 'block';
-    }).catch((error) => alert("Kod səhvdir"));
+
+  async function checkBusinessAndRedirect(user) {
+    const businessRef = ref(db, `businesses/${user.uid}`);
+    const snapshot = await get(businessRef);
+
+    if (!snapshot.exists()) {
+      const newBusiness = {
+        email: user.email,
+        name: user.displayName || '',
+        photoURL: user.photoURL || '',
+        createdAt: Date.now(),
+        plan: 'trial',
+        expiresAt: Date.now() + TRIAL_DAYS * MS_PER_DAY,
+        role: null
+      };
+      await set(businessRef, newBusiness);
+      localStorage.setItem('userId', user.uid);
+      document.getElementById('loginState').style.display = 'none';
+      document.getElementById('roles').style.display = 'block';
+      return;
+    }
+
+    const business = snapshot.val();
+    localStorage.setItem('userId', user.uid);
+
+    if (!isPlanValid(business)) {
+      document.getElementById('loginState').style.display = 'none';
+      document.getElementById('expiredBox').style.display = 'block';
+      return;
+    }
+
+    if (!business.role) {
+      document.getElementById('loginState').style.display = 'none';
+      document.getElementById('roles').style.display = 'block';
+      return;
+    }
+
+    window.location.href = 'dashboard.html?role=' + business.role;
   }
+
+  window.signInGoogle = () => {
+    signInWithPopup(auth, googleProvider).then((result) => {
+      checkBusinessAndRedirect(result.user);
+    }).catch((error) => alert('Giriş alınmadı: ' + error.message));
+  }
+
   window.saveRole = (role) => {
-    localStorage.setItem('petcrm_role', role); window.location.href = 'dashboard.html?role=' + role;
+    const uid = localStorage.getItem('userId');
+    update(ref(db, `businesses/${uid}`), { role: role }).then(() => {
+      localStorage.setItem('petcrm_role', role);
+      window.location.href = 'dashboard.html?role=' + role;
+    });
   }
+
+  onAuthStateChanged(auth, (user) => {
+    if (user) checkBusinessAndRedirect(user);
+  });
 </script>
 </body>
 </html>
