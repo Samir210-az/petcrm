@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="az">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PET CRM - Giriş</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="container">
+  <div class="login-box">
+    <div class="logo">PET<span>CRM</span></div>
+    <p class="subtitle">Heyvan dostlarının biznesi</p>
+    <input type="tel" id="phone" placeholder="+994 50 123 45 67">
+    <div id="recaptcha-container"></div>
+    <button onclick="sendCode()">SMS Kod Göndər</button>
+    <div id="codeBox" style="display:none;">
+      <input type="text" id="code" placeholder="SMS Kodu daxil et">
+      <button onclick="verifyCode()">Daxil Ol</button>
+    </div>
+    <div id="roles" style="display:none;">
+      <p>Siz kimsiniz?</p>
+      <button class="role-btn" onclick="saveRole('klinika')">🏥 Baytar Klinikası</button>
+      <button class="role-btn" onclick="saveRole('magaza')">🛍️ Zoomağaza / Grooming</button>
+    </div>
+  </div>
+</div>
+<script type="module">
+  import { auth, RecaptchaVerifier, signInWithPhoneNumber } from './assets/firebase.js';
+  window.recaptchaVerifier = new RecaptchaVerifier('recaptcha-container', { 'size': 'invisible' }, auth);
+  let confirmationResult;
+  window.sendCode = () => {
+    const phone = document.getElementById('phone').value;
+    signInWithPhoneNumber(auth, phone, window.recaptchaVerifier).then((result) => {
+      confirmationResult = result; document.getElementById('codeBox').style.display = 'block'; alert('SMS göndərildi');
+    }).catch((error) => alert(error.message));
+  }
+  window.verifyCode = () => {
+    const code = document.getElementById('code').value;
+    confirmationResult.confirm(code).then((result) => {
+      localStorage.setItem('userId', result.user.uid); document.getElementById('roles').style.display = 'block';
+    }).catch((error) => alert("Kod səhvdir"));
+  }
+  window.saveRole = (role) => {
+    localStorage.setItem('petcrm_role', role); window.location.href = 'dashboard.html?role=' + role;
+  }
+</script>
+</body>
+</html>
