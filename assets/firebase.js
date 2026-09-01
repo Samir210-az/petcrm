@@ -1,5 +1,5 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getDatabase, ref, set, get, child, push, onValue, update } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+import { getDatabase, ref, set, get, child, push, onValue, update, remove } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
 const firebaseConfig = {
@@ -16,7 +16,13 @@ const app = initializeApp(firebaseConfig);
 export const db = getDatabase(app);
 export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
-export { ref, set, get, child, push, onValue, update, signInWithPopup, onAuthStateChanged, signOut };
+export { ref, set, get, child, push, onValue, update, remove, signInWithPopup, onAuthStateChanged, signOut };
 
 export const TRIAL_DAYS = 3;
 export const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
+// Email-i Realtime Database açarı kimi istifadə edilə bilən formata çevirir
+// (RTDB açarlarında . # $ [ ] / simvolları qadağandır)
+export function emailToKey(email) {
+  return email.toLowerCase().trim().replace(/[.#$\[\]/]/g, '_');
+}
