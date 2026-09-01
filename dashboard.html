@@ -8,7 +8,10 @@
 <div class="container">
   <div class="header">
     <div><h2>PET CRM</h2><p id="roleTitle"></p></div>
-    <button onclick="window.location.href='pet-card.html'" style="width:auto;">+ Yeni Heyvan</button>
+    <div style="display:flex; gap:10px;">
+      <button id="teamBtn" onclick="window.location.href='team.html'" style="width:auto; display:none;">👥 Komandam</button>
+      <button onclick="window.location.href='pet-card.html'" style="width:auto;">+ Yeni Heyvan</button>
+    </div>
   </div>
   <div class="card">
     <h3>🚨 Smart Xəbərdarlıqlar</h3>
@@ -38,19 +41,37 @@
       window.location.href = 'index.html';
       return;
     }
-    const snapshot = await get(ref(db, `businesses/${user.uid}`));
-    const business = snapshot.val();
+
+    const userSnap = await get(ref(db, `users/${user.uid}`));
+    if (!userSnap.exists()) {
+      window.location.href = 'index.html';
+      return;
+    }
+
+    const userInfo = userSnap.val();
+    const businessSnap = await get(ref(db, `businesses/${userInfo.businessId}`));
+    const business = businessSnap.val();
+
     if (!isPlanValid(business)) {
       window.location.href = 'index.html';
       return;
     }
-    initDashboard();
+
+    initDashboard(business, userInfo);
   });
 
-  function initDashboard() {
-    const role = new URLSearchParams(window.location.search).get('role');
-    document.getElementById('roleTitle').innerText = role === 'magaza' ? 'Zoomağaza Paneli' : 'Baytar Klinikası Paneli';
-    if (role === 'magaza') document.getElementById('posCard').style.display = 'block';
+  const ROLE_LABELS = { baytar: 'Baytar', resepshn: 'Resepşn', laborant: 'Laborant', diger: 'İşçi' };
+
+  function initDashboard(business, userInfo) {
+    let titleText = business.businessType === 'magaza' ? 'Zoomağaza Paneli' : 'Baytar Klinikası Paneli';
+    if (!userInfo.isOwner) {
+      titleText += ` — ${ROLE_LABELS[userInfo.staffRole] || 'İşçi'}`;
+    }
+    document.getElementById('roleTitle').innerText = titleText;
+
+    if (business.businessType === 'magaza') document.getElementById('posCard').style.display = 'block';
+    if (userInfo.isOwner) document.getElementById('teamBtn').style.display = 'inline-block';
+
     const alertsRef = ref(db, 'alerts/');
     onValue(alertsRef, (snapshot) => {
       const data = snapshot.val(); let html = '';
