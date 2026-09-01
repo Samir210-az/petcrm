@@ -1,6 +1,6 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getDatabase, ref, set, get, child, push, onValue } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
-import { getAuth, signInWithPhoneNumber, RecaptchaVerifier } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import { getDatabase, ref, set, get, child, push, onValue, update } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyDTinMWmDgmpaNu1VcGQCvDC6M7j3IOKWY",
@@ -15,4 +15,8 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 export const db = getDatabase(app);
 export const auth = getAuth(app);
-export { ref, set, get, child, push, onValue, signInWithPhoneNumber, RecaptchaVerifier };
+export const googleProvider = new GoogleAuthProvider();
+export { ref, set, get, child, push, onValue, update, signInWithPopup, onAuthStateChanged, signOut };
+
+export const TRIAL_DAYS = 3;
+export const MS_PER_DAY = 24 * 60 * 60 * 1000;
