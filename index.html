@@ -17,19 +17,23 @@
     </div>
 
     <div id="roles" style="display:none;">
-      <p>Siz kimsiniz?</p>
-      <button class="role-btn" onclick="saveRole('klinika')">🏥 Baytar Klinikası</button>
-      <button class="role-btn" onclick="saveRole('magaza')">🛍️ Zoomağaza / Grooming</button>
+      <p>Biznesinizin növü nədir?</p>
+      <button class="role-btn" onclick="saveBusinessType('klinika')">🏥 Baytar Klinikası</button>
+      <button class="role-btn" onclick="saveBusinessType('magaza')">🛍️ Zoomağaza / Grooming</button>
     </div>
 
     <div id="expiredBox" class="alert" style="display:none; margin-top:20px;">
       Sınaq müddətiniz başa çatıb. Davam etmək üçün admin ilə əlaqə saxlayın.
     </div>
+
+    <div id="noInviteBox" class="alert" style="display:none; margin-top:20px;">
+      Bu email üçün heç bir dəvət tapılmadı. Müdirinizdən dəvət almalısınız.
+    </div>
   </div>
 </div>
 
 <script type="module">
-  import { auth, db, googleProvider, ref, get, set, update, signInWithPopup, onAuthStateChanged, TRIAL_DAYS, MS_PER_DAY } from './assets/firebase.js';
+  import { auth, db, googleProvider, ref, get, set, update, remove, signInWithPopup, onAuthStateChanged, emailToKey, TRIAL_DAYS, MS_PER_DAY } from './assets/firebase.js';
 
   function isPlanValid(business) {
     if (!business) return false;
@@ -42,43 +46,89 @@
     return false;
   }
 
-  async function checkBusinessAndRedirect(user) {
-    const businessRef = ref(db, `businesses/${user.uid}`);
-    const snapshot = await get(businessRef);
+  function showOnly(id) {
+    ['loginState', 'roles', 'expiredBox', 'noInviteBox'].forEach(x => {
+      document.getElementById(x).style.display = (x === id) ? 'block' : 'none';
+    });
+  }
 
-    if (!snapshot.exists()) {
-      const newBusiness = {
-        email: user.email,
-        name: user.displayName || '',
-        photoURL: user.photoURL || '',
-        createdAt: Date.now(),
-        plan: 'trial',
-        expiresAt: Date.now() + TRIAL_DAYS * MS_PER_DAY,
-        role: null
-      };
-      await set(businessRef, newBusiness);
-      localStorage.setItem('userId', user.uid);
-      document.getElementById('loginState').style.display = 'none';
-      document.getElementById('roles').style.display = 'block';
+  async function goToDashboard(businessId) {
+    const businessSnap = await get(ref(db, `businesses/${businessId}`));
+    const business = businessSnap.val();
+    if (!isPlanValid(business)) {
+      showOnly('expiredBox');
       return;
     }
+    window.location.href = 'dashboard.html';
+  }
 
-    const business = snapshot.val();
+  async function checkStaffInvite(user) {
+    const inviteKey = emailToKey(user.email);
+    const inviteSnap = await get(ref(db, `staffDirectory/${inviteKey}`));
+
+    if (!inviteSnap.exists()) return false;
+
+    const invite = inviteSnap.val();
+    // Işçini biznesin staff siyahısına əlavə edirik
+    await set(ref(db, `businesses/${invite.businessId}/staff/${user.uid}`), {
+      role: invite.role,
+      email: user.email,
+      name: user.displayName || '',
+      addedAt: Date.now()
+    });
+    // Sürətli axtarış üçün users/ node-una yazırıq
+    await set(ref(db, `users/${user.uid}`), {
+      businessId: invite.businessId,
+      isOwner: false,
+      staffRole: invite.role
+    });
+    // Dəvəti "istifadə edilmiş" kimi silirik
+    await remove(ref(db, `staffDirectory/${inviteKey}`));
+
+    localStorage.setItem('userId', user.uid);
+    await goToDashboard(invite.businessId);
+    return true;
+  }
+
+  async function checkBusinessAndRedirect(user) {
     localStorage.setItem('userId', user.uid);
 
-    if (!isPlanValid(business)) {
-      document.getElementById('loginState').style.display = 'none';
-      document.getElementById('expiredBox').style.display = 'block';
+    // 1) Əvvəlcə users/ node-undan bu şəxsin artıq bağlı olduğu biznesi yoxlayırıq
+    const userSnap = await get(ref(db, `users/${user.uid}`));
+    if (userSnap.exists()) {
+      await goToDashboard(userSnap.val().businessId);
       return;
     }
 
-    if (!business.role) {
-      document.getElementById('loginState').style.display = 'none';
-      document.getElementById('roles').style.display = 'block';
+    // 2) Sahib kimi öz biznes qeydi varmı?
+    const businessSnap = await get(ref(db, `businesses/${user.uid}`));
+    if (businessSnap.exists()) {
+      const business = businessSnap.val();
+      if (!business.businessType) {
+        showOnly('roles');
+        return;
+      }
+      await goToDashboard(user.uid);
       return;
     }
 
-    window.location.href = 'dashboard.html?role=' + business.role;
+    // 3) Bu email üçün staff dəvəti varmı?
+    const linked = await checkStaffInvite(user);
+    if (linked) return;
+
+    // 4) Heç biri yoxdursa — yeni sahib kimi qeydiyyat (3 günlük sınaq)
+    const newBusiness = {
+      email: user.email,
+      name: user.displayName || '',
+      photoURL: user.photoURL || '',
+      createdAt: Date.now(),
+      plan: 'trial',
+      expiresAt: Date.now() + TRIAL_DAYS * MS_PER_DAY,
+      businessType: null
+    };
+    await set(ref(db, `businesses/${user.uid}`), newBusiness);
+    await set(ref(db, `users/${user.uid}`), { businessId: user.uid, isOwner: true });
+    showOnly('roles');
   }
 
   window.signInGoogle = () => {
@@ -87,11 +137,10 @@
     }).catch((error) => alert('Giriş alınmadı: ' + error.message));
   }
 
-  window.saveRole = (role) => {
+  window.saveBusinessType = (type) => {
     const uid = localStorage.getItem('userId');
-    update(ref(db, `businesses/${uid}`), { role: role }).then(() => {
-      localStorage.setItem('petcrm_role', role);
-      window.location.href = 'dashboard.html?role=' + role;
+    update(ref(db, `businesses/${uid}`), { businessType: type }).then(() => {
+      window.location.href = 'dashboard.html';
     });
   }
 
