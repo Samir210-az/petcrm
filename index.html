@@ -82,8 +82,9 @@
       isOwner: false,
       staffRole: invite.role
     });
-    // Dəvəti "istifadə edilmiş" kimi silirik
+    // Dəvəti "istifadə edilmiş" kimi silirik (həm staffDirectory, həm də owner-in gördüyü güzgü)
     await remove(ref(db, `staffDirectory/${inviteKey}`));
+    await remove(ref(db, `businesses/${invite.businessId}/pendingInvites/${inviteKey}`));
 
     localStorage.setItem('userId', user.uid);
     await goToDashboard(invite.businessId);
