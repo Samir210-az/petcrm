@@ -81,21 +81,24 @@
   }
 
   async function loadPendingInvites() {
-    const snap = await get(ref(db, 'staffDirectory'));
+    const snap = await get(ref(db, `businesses/${currentBusinessId}/pendingInvites`));
     const data = snap.val() || {};
     const listEl = document.getElementById('pendingList');
-    const pending = Object.entries(data).filter(([key, invite]) => invite.businessId === currentBusinessId);
+    const keys = Object.keys(data);
 
-    if (pending.length === 0) {
+    if (keys.length === 0) {
       listEl.innerHTML = 'Gözləyən dəvət yoxdur';
       return;
     }
 
-    listEl.innerHTML = pending.map(([key, invite]) => `
+    listEl.innerHTML = keys.map(key => {
+      const invite = data[key];
+      return `
       <div class="pos-item">
         <span>${invite.email} <span class="badge">${ROLE_LABELS[invite.role] || invite.role}</span></span>
         <button onclick="cancelInvite('${key}')" style="width:auto; background:#777;">Ləğv Et</button>
-      </div>`).join('');
+      </div>`;
+    }).join('');
   }
 
   window.inviteStaff = async () => {
@@ -104,12 +107,14 @@
     if (!email) { alert('Email daxil edin'); return; }
 
     const key = emailToKey(email);
-    await set(ref(db, `staffDirectory/${key}`), {
-      businessId: currentBusinessId,
-      email: email,
-      role: role,
-      invitedAt: Date.now()
+    const inviteData = { businessId: currentBusinessId, email: email, role: role, invitedAt: Date.now() };
+
+    await set(ref(db, `staffDirectory/${key}`), inviteData);
+    // Owner-in özü görə bilsin deyə öz biznesinin altında da güzgü saxlayırıq
+    await set(ref(db, `businesses/${currentBusinessId}/pendingInvites/${key}`), {
+      email: email, role: role, invitedAt: inviteData.invitedAt
     });
+
     document.getElementById('staffEmail').value = '';
     alert('Dəvət göndərildi. İşçi öz Google hesabı ilə daxil olanda avtomatik əlavə olunacaq.');
     loadPendingInvites();
@@ -124,6 +129,7 @@
 
   window.cancelInvite = async (key) => {
     await remove(ref(db, `staffDirectory/${key}`));
+    await remove(ref(db, `businesses/${currentBusinessId}/pendingInvites/${key}`));
     loadPendingInvites();
   }
 </script>
